@@ -1,114 +1,183 @@
-﻿using HR_System.Models;
-using HR_System.Services;
+using HR_System.DTOs.Systems;
+using HR_System.Models;
 using MongoDB.Driver;
-using System.Linq; // זה קריטי בשביל הפעולות האלו
-using System.Collections.Generic;
-public class SystemService : ISystemService
+
+namespace HR_System.Services
 {
-    private readonly IMongoCollection<SystemModel> _systems;
-    private readonly IMongoCollection<Employee> _employees;
-
-    public SystemService(IMongoDatabase database)
+    public class SystemService : ISystemService
     {
-        _systems = database.GetCollection<SystemModel>("systems");
-        _employees = database.GetCollection<Employee>("employees");
-    }
+        private readonly IMongoCollection<SystemModel> _systemsCollection;
+        private readonly IMongoCollection<Employee> _employeesCollection;
 
-    public async Task<List<SystemModel>> GetSystemsWithUtilizationAsync()
-    {
-        // 1. שליפת כל המערכות
-        var systems = await _systems.Find(_ => true).ToListAsync();
-
-        // 2. שליפת כל העובדים כדי לסכום את העבודה שלהם
-        var allEmployees = await _employees.Find(_ => true).ToListAsync();
-
-        foreach (var system in systems)
+        public SystemService(IMongoDatabase database)
         {
-            // 3. לוגיקת החישוב: סכימת ActualMonths לפי ה-SystemId
-            system.ActualUtilization = allEmployees
-                .SelectMany(e => e.Allocations)
-                .Where(a => a.SystemId == system.Id)
-                .Sum(a => (decimal)a.ActualMonths);
+            _systemsCollection = database.GetCollection<SystemModel>("systems");
+            _employeesCollection = database.GetCollection<Employee>("employees");
         }
 
-        return systems;
-    }
-    public async Task<List<SystemModel>> GetSystemsGapAnalysisAsync()
-    {
-        var systems = await _systems.Find(_ => true).ToListAsync();
-        var allEmployees = await _employees.Find(_ => true).ToListAsync();
-
-        foreach (var system in systems)
+    
+        public async Task<List<SystemListItemDto>> GetSystemsAsync(
+            int? year = null,
+            string? status = null,
+            string? ownerManagerName = null,
+            string? search = null)
         {
-            decimal totalActual = allEmployees
-                .SelectMany(e => e.Allocations)
-                .Where(a => a.SystemId?.ToString() == system.Id?.ToString())
-                .Sum(a => a.ActualMonths);
+            var systems = await _systemsCollection.Find(_ => true).ToListAsync();
+            var employees = await _employeesCollection.Find(_ => true).ToListAsync();
 
-            system.ActualUtilization = totalActual;
-        }
+            var filtered = systems.AsEnumerable();
 
-        return systems;
-    }
-    public async Task<List<SystemModel>> GetSystemsGapAnalysisByDepartmentAsync(string departmentId)
-    {
-        var systems = await _systems.Find(_ => true).ToListAsync();
-
-        var departmentEmployees = await _employees
-            .Find(e => e.DepartmentId == departmentId)
-            .ToListAsync();
-
-        foreach (var system in systems)
-        {
-            decimal totalActual = departmentEmployees
-                .SelectMany(e => e.Allocations)
-                .Where(a => a.SystemId?.ToString() == system.Id?.ToString())
-                .Sum(a => a.ActualMonths);
-
-            system.ActualUtilization = totalActual;
-        }
-
-        return systems;
-    }
-    // 1. פונקציית סכימה בלבד (הכי חזקה ונקיה)
-    public async Task<Dictionary<string, decimal>> GetActualUsageByDepartmentAsync(string departmentId)
-    {
-        var employees = await _employees.Find(e => e.DepartmentId == departmentId).ToListAsync();
-
-        // נשתמש במילון פשוט
-        var usageMap = new Dictionary<string, decimal>();
-
-        foreach (var emp in employees)
-        {
-            if (emp.Allocations == null) continue;
-
-            foreach (var alloc in emp.Allocations)
+            if (year.HasValue)
             {
-                if (alloc.SystemId == null) continue;
-
-                string idKey = alloc.SystemId.ToString();
-
-                if (usageMap.ContainsKey(idKey))
-                    usageMap[idKey] += (decimal)alloc.ActualMonths;
-                else
-                    usageMap[idKey] = (decimal)alloc.ActualMonths;
+                filtered = filtered.Where(s => s.Year == year.Value);
             }
+
+            if (!string.IsNullOrWhiteSpace(ownerManagerName))
+            {
+                filtered = filtered.Where(s =>
+                    string.Equals(s.OwnerManagerName, ownerManagerName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchTerm = search.Trim();
+                filtered = filtered.Where(s =>
+                    (!string.IsNullOrWhiteSpace(s.Name) && s.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(s.OwnerManagerName) && s.OwnerManagerName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(s.ManagementNote) && s.ManagementNote.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            var list = filtered
+                .Select(s => MapToListItemDto(s, employees))
+                .ToList();
+
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                list = list
+                    .Where(s => string.Equals(s.CapacityStatus, status, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            return list
+                .OrderBy(s => s.Name)
+                .ToList();
         }
 
-        return usageMap;
-    }
+      
+        public async Task<SystemDetailsDto?> GetSystemByIdAsync(string id)
+        {
+            var system = await _systemsCollection.Find(s => s.Id == id).FirstOrDefaultAsync();
+            if (system is null)
+            {
+                return null;
+            }
 
-    // 2. הפונקציה שמאחדת הכל לדו"ח (זה מה שיחזיר את הטבלה)
-    public async Task<List<object>> GetDepartmentReportAsync(string departmentId)
-    {
-        var systems = await _systems.Find(_ => true).ToListAsync();
-        var actualUsageMap = await GetActualUsageByDepartmentAsync(departmentId);
+            var employees = await _employeesCollection.Find(_ => true).ToListAsync();
 
-        return systems.Select(s => new {
-            SystemName = s.Name,
-            IsProject = s.IsProject,
-            Budget = s.RequiredCapacity, // התקציב
-            Actual = actualUsageMap.ContainsKey(s.Id.ToString()) ? actualUsageMap[s.Id.ToString()] : 0 // הסכימה
-        }).Cast<object>().ToList();
+            var assignedEmployees = employees
+                .SelectMany(e => (e.Allocations ?? [])
+                    .Where(a => string.Equals(a.SystemId, id, StringComparison.OrdinalIgnoreCase))
+                    .Select(a => new { Employee = e, Allocation = a }))
+                .Select(x => new SystemAssignedEmployeeDto(
+                    x.Employee.Id ?? string.Empty,
+                    x.Employee.FullName,
+                    x.Employee.ProfessionalCategory,
+                    x.Employee.ProfessionalSubCategory,
+                    x.Employee.ManagerName,
+                    x.Allocation.RoleInSystem,
+                    x.Allocation.PlannedMonths,
+                    x.Allocation.ActualMonths,
+                    GetEmployeeAvailabilityStatus(x.Employee)))
+                .OrderBy(x => x.FullName)
+                .ToList();
+
+            var allocatedMonths = GetAllocatedMonthsBySystemId(employees, id);
+            var gap = system.RequiredCapacityMonths - allocatedMonths;
+
+            return new SystemDetailsDto(
+                system.Id ?? string.Empty,
+                system.Name,
+                system.RequiredCapacityMonths,
+                allocatedMonths,
+                gap,
+                GetCapacityStatus(gap),
+                GetAssignedEmployeesCount(employees, id),
+                system.ManagementNote,
+                null, // TODO: Add system relevant changes field in model when available.
+                assignedEmployees,
+                []);
+        }
+
+      
+        private static SystemListItemDto MapToListItemDto(SystemModel system, IEnumerable<Employee> employees)
+        {
+            var systemId = system.Id ?? string.Empty;
+            var allocatedMonths = GetAllocatedMonthsBySystemId(employees, systemId);
+            var gap = system.RequiredCapacityMonths - allocatedMonths;
+
+            return new SystemListItemDto(
+                systemId,
+                system.Name,
+                system.Year,
+                system.RequiredCapacityMonths,
+                allocatedMonths,
+                gap,
+                GetCapacityStatus(gap),
+                GetAssignedEmployeesCount(employees, systemId),
+                system.ManagementNote);
+        }
+
+       
+        private static int GetAllocatedMonthsBySystemId(IEnumerable<Employee> employees, string systemId)
+        {
+            return employees
+                .SelectMany(e => e.Allocations ?? [])
+                .Where(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase))
+                .Sum(a => a.ActualMonths);
+        }
+
+       
+        private static int GetAssignedEmployeesCount(IEnumerable<Employee> employees, string systemId)
+        {
+            return employees
+                .Where(e => (e.Allocations ?? [])
+                    .Any(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase)))
+                .Count();
+        }
+
+       
+        private static string GetCapacityStatus(int gap)
+        {
+            if (gap > 0)
+            {
+                return "Shortage";
+            }
+
+            if (gap == 0)
+            {
+                return "Balanced";
+            }
+
+            return "Excess";
+        }
+
+     
+        private static string GetEmployeeAvailabilityStatus(Employee employee)
+        {
+            var allocated = (employee.Allocations ?? []).Sum(a => a.ActualMonths);
+            var remaining = employee.YearlyCapacityMonths - allocated;
+
+            if (remaining > 0)
+            {
+                return "Available";
+            }
+
+            if (remaining == 0)
+            {
+                return "Balanced";
+            }
+
+            return "Overloaded";
+        }
     }
 }

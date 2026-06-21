@@ -3,23 +3,23 @@ using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. чшйаъ двгшеъ дзйбеш оъек д-appsettings.json
+// 1. пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ-appsettings.json
 var connectionString = builder.Configuration["MongoDB:ConnectionString"];
 var databaseName = builder.Configuration["MongoDB:DatabaseName"];
 
-// 2. шйщен д-MongoClient л-Singleton (оефт азг млм дотшлъ)
+// 2. пїЅпїЅпїЅпїЅпїЅ пїЅ-MongoClient пїЅ-Singleton (пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ)
 builder.Services.AddSingleton<IMongoClient>(new MongoClient(connectionString));
 
-// 3. шйщен д-IMongoDatabase (жд од щзсш мк лгй мфъеш аъ дщвйад)
+// 3. пїЅпїЅпїЅпїЅпїЅ пїЅ-IMongoDatabase (пїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ)
 builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(databaseName));
 
-// 4. шйщен дсшеейсйн щмк
+// 4. пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<IEmployeeService, EmployeeService>();
+builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ISystemService, SystemService>();
 
 var app = builder.Build();

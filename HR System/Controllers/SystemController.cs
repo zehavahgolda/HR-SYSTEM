@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using HR_System.Models;
+using HR_System.DTOs.Systems;
 using HR_System.Services;
 
 [ApiController]
@@ -14,11 +14,15 @@ public class SystemController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<SystemModel>>> GetAllSystems()
+    public async Task<ActionResult<List<SystemListItemDto>>> GetSystems(
+        [FromQuery] int? year,
+        [FromQuery] string? status,
+        [FromQuery] string? ownerManagerName,
+        [FromQuery] string? search)
     {
         try
         {
-            var systems = await _systemService.GetSystemsWithUtilizationAsync();
+            var systems = await _systemService.GetSystemsAsync(year, status, ownerManagerName, search);
             return Ok(systems);
         }
         catch (Exception ex)
@@ -26,31 +30,23 @@ public class SystemController : ControllerBase
             return StatusCode(500, $"Internal server error: {ex.Message}");
         }
     }
-    [HttpGet("gap-analysis")]
-    public async Task<ActionResult<List<SystemModel>>> GetGapAnalysis()
-    {
-        var analysis = await _systemService.GetSystemsGapAnalysisAsync();
-        return Ok(analysis);
-    }
 
-    [HttpGet("gap-analysis/{departmentId}")]
-    public async Task<ActionResult<List<SystemModel>>> GetGapAnalysisByDept(string departmentId)
+    [HttpGet("{id}")]
+    public async Task<ActionResult<SystemDetailsDto>> GetSystemById(string id)
     {
-        var analysis = await _systemService.GetSystemsGapAnalysisByDepartmentAsync(departmentId);
-        return Ok(analysis);
-    }
-    [HttpGet("report/{departmentId}")]
-    public async Task<ActionResult<List<object>>> GetDepartmentReport(string departmentId)
-    {
-        // קריאה לפונקציה החדשה שיצרנו ב-Service
-        var report = await _systemService.GetDepartmentReportAsync(departmentId);
-
-        // אם הדו"ח ריק, אפשר להחזיר NotFound או פשוט רשימה ריקה
-        if (report == null)
+        try
         {
-            return NotFound("Department not found or no data available.");
-        }
+            var system = await _systemService.GetSystemByIdAsync(id);
+            if (system is null)
+            {
+                return NotFound();
+            }
 
-        return Ok(report);
+            return Ok(system);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Internal server error: {ex.Message}");
+        }
     }
 }

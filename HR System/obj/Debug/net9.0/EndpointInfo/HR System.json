@@ -10,9 +10,112 @@
         "tags": [
           "Employees"
         ],
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "managerName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "professionalCategory",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "systemId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployeeListItemDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployeeListItemDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployeeListItemDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Employees/{id}": {
+      "get": {
+        "tags": [
+          "Employees"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeDetailsDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeDetailsDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployeeDetailsDto"
+                }
+              }
+            }
           }
         }
       }
@@ -32,7 +135,14 @@
             }
           },
           {
-            "name": "functionName",
+            "name": "systemId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roleInSystem",
             "in": "query",
             "schema": {
               "type": "string"
@@ -59,87 +169,32 @@
         "tags": [
           "System"
         ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/System/gap-analysis": {
-      "get": {
-        "tags": [
-          "System"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              },
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              },
-              "text/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/SystemModel"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/System/gap-analysis/{departmentId}": {
-      "get": {
-        "tags": [
-          "System"
-        ],
         "parameters": [
           {
-            "name": "departmentId",
-            "in": "path",
-            "required": true,
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerManagerName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
             "schema": {
               "type": "string"
             }
@@ -153,7 +208,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SystemModel"
+                    "$ref": "#/components/schemas/SystemListItemDto"
                   }
                 }
               },
@@ -161,7 +216,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SystemModel"
+                    "$ref": "#/components/schemas/SystemListItemDto"
                   }
                 }
               },
@@ -169,7 +224,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/SystemModel"
+                    "$ref": "#/components/schemas/SystemListItemDto"
                   }
                 }
               }
@@ -178,14 +233,14 @@
         }
       }
     },
-    "/api/System/report/{departmentId}": {
+    "/api/System/{id}": {
       "get": {
         "tags": [
           "System"
         ],
         "parameters": [
           {
-            "name": "departmentId",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
@@ -199,20 +254,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "type": "array",
-                  "items": { }
+                  "$ref": "#/components/schemas/SystemDetailsDto"
                 }
               },
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": { }
+                  "$ref": "#/components/schemas/SystemDetailsDto"
                 }
               },
               "text/json": {
                 "schema": {
-                  "type": "array",
-                  "items": { }
+                  "$ref": "#/components/schemas/SystemDetailsDto"
                 }
               }
             }
@@ -223,7 +275,227 @@
   },
   "components": {
     "schemas": {
-      "SystemModel": {
+      "EmployeeAllocationDto": {
+        "type": "object",
+        "properties": {
+          "systemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "systemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "systemCapacityStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "roleInSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "plannedMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "actualMonths": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmployeeDetailsDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalSubCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "managerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "yearlyCapacityMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocatedMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedSystemsCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "upcomingEvent": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "managerReviewNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "relevantChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeeRelevantChangeDto"
+            },
+            "nullable": true
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EmployeeAllocationDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmployeeListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalSubCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "managerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "yearlyCapacityMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocatedMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "remainingMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedSystemsCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "upcomingEvent": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "EmployeeRelevantChangeDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemAssignedEmployeeDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "professionalSubCategory": {
+            "type": "string",
+            "nullable": true
+          },
+          "managerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "roleInSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "plannedMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "actualMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "availabilityStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemDetailsDto": {
         "type": "object",
         "properties": {
           "id": {
@@ -234,21 +506,107 @@
             "type": "string",
             "nullable": true
           },
-          "requiredCapacity": {
+          "requiredCapacityMonths": {
             "type": "integer",
             "format": "int32"
           },
-          "isProject": {
-            "type": "boolean"
-          },
-          "actualUtilization": {
-            "type": "number",
-            "format": "double"
+          "allocatedMonths": {
+            "type": "integer",
+            "format": "int32"
           },
           "gap": {
-            "type": "number",
-            "format": "double",
-            "readOnly": true
+            "type": "integer",
+            "format": "int32"
+          },
+          "capacityStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedEmployeesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "managementNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "relevantChanges": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedEmployees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemAssignedEmployeeDto"
+            },
+            "nullable": true
+          },
+          "sistemRelevantChanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SystemRelevantChangeDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemListItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requiredCapacityMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allocatedMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gap": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "capacityStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "assignedEmployeesCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "managementNote": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "SystemRelevantChangeDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "date": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false

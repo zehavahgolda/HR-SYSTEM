@@ -1,13 +1,75 @@
 [
   {
     "ContainingType": "HR_System.Controllers.EmployeesController",
-    "Method": "Get",
+    "Method": "GetEmployees",
     "RelativePath": "api/Employees",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": []
+    "Parameters": [
+      {
+        "Name": "year",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "managerName",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "professionalCategory",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "systemId",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "search",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[HR_System.DTOs.Employees.EmployeeListItemDto, HR System, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "HR_System.Controllers.EmployeesController",
+    "Method": "GetEmployeeById",
+    "RelativePath": "api/Employees/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "HR_System.DTOs.Employees.EmployeeDetailsDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "HR_System.Controllers.EmployeesController",
@@ -23,13 +85,18 @@
         "IsRequired": true
       },
       {
-        "Name": "functionName",
+        "Name": "systemId",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "roleInSystem",
         "Type": "System.String",
         "IsRequired": false
       },
       {
         "Name": "actualMonths",
-        "Type": "System.Int32",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
         "IsRequired": false
       }
     ],
@@ -37,15 +104,36 @@
   },
   {
     "ContainingType": "SystemController",
-    "Method": "GetAllSystems",
+    "Method": "GetSystems",
     "RelativePath": "api/System",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
-    "Parameters": [],
+    "Parameters": [
+      {
+        "Name": "year",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "status",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "ownerManagerName",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "search",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
     "ReturnTypes": [
       {
-        "Type": "System.Collections.Generic.List\u00601[[SystemModel, HR System, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "Type": "System.Collections.Generic.List\u00601[[HR_System.DTOs.Systems.SystemListItemDto, HR System, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "MediaTypes": [
           "text/plain",
           "application/json",
@@ -57,67 +145,21 @@
   },
   {
     "ContainingType": "SystemController",
-    "Method": "GetGapAnalysis",
-    "RelativePath": "api/System/gap-analysis",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[SystemModel, HR System, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "SystemController",
-    "Method": "GetGapAnalysisByDept",
-    "RelativePath": "api/System/gap-analysis/{departmentId}",
+    "Method": "GetSystemById",
+    "RelativePath": "api/System/{id}",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
-        "Name": "departmentId",
+        "Name": "id",
         "Type": "System.String",
         "IsRequired": true
       }
     ],
     "ReturnTypes": [
       {
-        "Type": "System.Collections.Generic.List\u00601[[SystemModel, HR System, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "SystemController",
-    "Method": "GetDepartmentReport",
-    "RelativePath": "api/System/report/{departmentId}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "departmentId",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[System.Object, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "Type": "HR_System.DTOs.Systems.SystemDetailsDto",
         "MediaTypes": [
           "text/plain",
           "application/json",
