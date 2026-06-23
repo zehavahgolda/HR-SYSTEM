@@ -1,6 +1,9 @@
 using HR_System.DTOs.Systems;
 using HR_System.Models;
 using MongoDB.Driver;
+using Microsoft.Extensions.Configuration;
+using ClosedXML.Excel;
+using System.IO;
 
 namespace HR_System.Services
 {
@@ -8,35 +11,25 @@ namespace HR_System.Services
     {
         private readonly IMongoCollection<SystemModel> _systemsCollection;
         private readonly IMongoCollection<Employee> _employeesCollection;
+        private readonly IConfiguration _configuration;
 
-        public SystemService(IMongoDatabase database)
+        public SystemService(IMongoDatabase database, IConfiguration configuration)
         {
             _systemsCollection = database.GetCollection<SystemModel>("systems");
             _employeesCollection = database.GetCollection<Employee>("employees");
+            _configuration = configuration;
         }
 
-    
         public async Task<List<SystemListItemDto>> GetSystemsAsync(
-            int? year = null,
-            string? status = null,
-            string? ownerManagerName = null,
-            string? search = null)
+            int? year = null, string? status = null, string? ownerManagerName = null, string? search = null)
         {
             var systems = await _systemsCollection.Find(_ => true).ToListAsync();
             var employees = await _employeesCollection.Find(_ => true).ToListAsync();
-
             var filtered = systems.AsEnumerable();
 
-            if (year.HasValue)
-            {
-                filtered = filtered.Where(s => s.Year == year.Value);
-            }
-
+            if (year.HasValue) filtered = filtered.Where(s => s.Year == year.Value);
             if (!string.IsNullOrWhiteSpace(ownerManagerName))
-            {
-                filtered = filtered.Where(s =>
-                    string.Equals(s.OwnerManagerName, ownerManagerName, StringComparison.OrdinalIgnoreCase));
-            }
+                filtered = filtered.Where(s => string.Equals(s.OwnerManagerName, ownerManagerName, StringComparison.OrdinalIgnoreCase));
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -47,137 +40,145 @@ namespace HR_System.Services
                     (!string.IsNullOrWhiteSpace(s.ManagementNote) && s.ManagementNote.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
             }
 
-            var list = filtered
-                .Select(s => MapToListItemDto(s, employees))
-                .ToList();
-
+            var list = filtered.Select(s => MapToListItemDto(s, employees)).ToList();
             if (!string.IsNullOrWhiteSpace(status))
-            {
-                list = list
-                    .Where(s => string.Equals(s.CapacityStatus, status, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-            }
+                list = list.Where(s => string.Equals(s.CapacityStatus, status, StringComparison.OrdinalIgnoreCase)).ToList();
 
-            return list
+            return list.OrderBy(s => s.Name).ToList();
+        }
+
+        public async Task<List<SystemListItemDto>> GetSystemsWithShortageAsync()
+        {
+            var systems = await _systemsCollection.Find(_ => true).ToListAsync();
+            var employees = await _employeesCollection.Find(_ => true).ToListAsync();
+
+            return systems
+                .Select(s => MapToListItemDto(s, employees))
+                .Where(s => s.CapacityStatus == "Shortage")
                 .OrderBy(s => s.Name)
                 .ToList();
         }
 
-      
         public async Task<SystemDetailsDto?> GetSystemByIdAsync(string id)
         {
             var system = await _systemsCollection.Find(s => s.Id == id).FirstOrDefaultAsync();
-            if (system is null)
-            {
-                return null;
-            }
+            if (system is null) return null;
 
             var employees = await _employeesCollection.Find(_ => true).ToListAsync();
 
+            // איסוף הקצאות למערכת זו
+            var allocations = employees.SelectMany(e => (e.Allocations ?? []).Where(a => string.Equals(a.SystemId, id, StringComparison.OrdinalIgnoreCase)));
+
             var assignedEmployees = employees
-                .SelectMany(e => (e.Allocations ?? [])
-                    .Where(a => string.Equals(a.SystemId, id, StringComparison.OrdinalIgnoreCase))
-                    .Select(a => new { Employee = e, Allocation = a }))
+                .SelectMany(e => (e.Allocations ?? []).Where(a => string.Equals(a.SystemId, id, StringComparison.OrdinalIgnoreCase))
+                .Select(a => new { Employee = e, Allocation = a }))
                 .Select(x => new SystemAssignedEmployeeDto(
-                    x.Employee.Id ?? string.Empty,
-                    x.Employee.FullName,
-                    x.Employee.ProfessionalCategory,
-                    x.Employee.ProfessionalSubCategory,
-                    x.Employee.ManagerName,
-                    x.Allocation.RoleInSystem,
-                    x.Allocation.PlannedMonths,
-                    x.Allocation.ActualMonths,
-                    GetEmployeeAvailabilityStatus(x.Employee)))
-                .OrderBy(x => x.FullName)
-                .ToList();
+                    x.Employee.Id ?? string.Empty, x.Employee.FullName, x.Employee.ProfessionalCategory,
+                    x.Employee.ProfessionalSubCategory, x.Employee.ManagerName, x.Allocation.RoleInSystem,
+                    x.Allocation.PlannedMonths, x.Allocation.ActualMonths, GetEmployeeAvailabilityStatus(x.Employee)))
+                .OrderBy(x => x.FullName).ToList();
 
             var allocatedMonths = GetAllocatedMonthsBySystemId(employees, id);
             var gap = system.RequiredCapacityMonths - allocatedMonths;
+            var costPerManMonth = _configuration.GetValue<decimal>("BudgetSettings:CostPerManMonth");
+            var budget = (decimal)allocatedMonths * costPerManMonth;
+
+            // חישוב ניתוח סטיות (Variance Analysis)
+            int totalPlanned = allocations.Sum(a => a.PlannedMonths);
+            int totalActual = allocatedMonths;
+            double variancePercent = 0;
+            if (totalPlanned > 0)
+            {
+                variancePercent = ((double)(totalActual - totalPlanned) / totalPlanned) * 100;
+            }
 
             return new SystemDetailsDto(
-                system.Id ?? string.Empty,
-                system.Name,
-                system.RequiredCapacityMonths,
-                allocatedMonths,
-                gap,
-                GetCapacityStatus(gap),
-                GetAssignedEmployeesCount(employees, id),
-                system.ManagementNote,
-                null, // TODO: Add system relevant changes field in model when available.
-                assignedEmployees,
-                []);
+                system.Id ?? string.Empty, system.Name, system.RequiredCapacityMonths,
+                allocatedMonths, gap, GetCapacityStatus(gap), GetAssignedEmployeesCount(employees, id),
+                system.ManagementNote, system.UpdatedAt?.ToString("yyyy-MM-dd"), assignedEmployees, [], budget,
+                totalPlanned, totalActual, Math.Round(variancePercent, 2)
+            );
         }
 
-      
+        public async Task<byte[]> ExportSystemsToExcelAsync(int? year = null, string? status = null)
+        {
+            var systems = await GetSystemsAsync(year, status);
+            var employees = await _employeesCollection.Find(_ => true).ToListAsync();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("SystemsReport");
+
+                // 1. כותרות
+                worksheet.Cell(1, 1).Value = "System Name";
+                worksheet.Cell(1, 2).Value = "Required Capacity";
+                worksheet.Cell(1, 3).Value = "Allocated";
+                worksheet.Cell(1, 4).Value = "Planned";
+                worksheet.Cell(1, 5).Value = "Actual";
+                worksheet.Cell(1, 6).Value = "Variance %";
+                worksheet.Cell(1, 7).Value = "Status";
+
+                // 2. מילוי נתונים
+                int currentRow = 2;
+                foreach (var system in systems)
+                {
+                    var systemId = system.Id;
+                    var totalPlanned = employees.SelectMany(e => e.Allocations ?? [])
+                                               .Where(a => a.SystemId == systemId)
+                                               .Sum(a => a.PlannedMonths);
+
+                    var totalActual = system.AllocatedMonths;
+                    double variance = totalPlanned > 0 ? ((double)(totalActual - totalPlanned) / totalPlanned) * 100 : 0;
+
+                    worksheet.Cell(currentRow, 1).Value = system.Name;
+                    worksheet.Cell(currentRow, 2).Value = system.RequiredCapacityMonths;
+                    worksheet.Cell(currentRow, 3).Value = system.AllocatedMonths;
+                    worksheet.Cell(currentRow, 4).Value = totalPlanned;
+                    worksheet.Cell(currentRow, 5).Value = totalActual;
+                    worksheet.Cell(currentRow, 6).Value = Math.Round(variance, 2);
+                    worksheet.Cell(currentRow, 7).Value = system.CapacityStatus;
+
+                    currentRow++;
+                }
+
+                // 3. שורת סיכום מתוקנת
+                worksheet.Cell(currentRow, 1).Value = "TOTAL";
+
+                // שינוי: הטווח מסתיים בשורה אחת מעל הנוכחית (currentRow - 1)
+                // זה מבטיח שהנוסחה לא כוללת את עצמה
+                worksheet.Cell(currentRow, 2).FormulaA1 = $"SUM(B2:B{currentRow - 1})";
+                worksheet.Cell(currentRow, 3).FormulaA1 = $"SUM(C2:C{currentRow - 1})";
+                worksheet.Cell(currentRow, 4).FormulaA1 = $"SUM(D2:D{currentRow - 1})";
+                worksheet.Cell(currentRow, 5).FormulaA1 = $"SUM(E2:E{currentRow - 1})";
+
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return stream.ToArray();
+                }
+            }
+        }
         private static SystemListItemDto MapToListItemDto(SystemModel system, IEnumerable<Employee> employees)
         {
             var systemId = system.Id ?? string.Empty;
             var allocatedMonths = GetAllocatedMonthsBySystemId(employees, systemId);
             var gap = system.RequiredCapacityMonths - allocatedMonths;
-
-            return new SystemListItemDto(
-                systemId,
-                system.Name,
-                system.Year,
-                system.RequiredCapacityMonths,
-                allocatedMonths,
-                gap,
-                GetCapacityStatus(gap),
-                GetAssignedEmployeesCount(employees, systemId),
-                system.ManagementNote);
+            return new SystemListItemDto(systemId, system.Name, system.Year, system.RequiredCapacityMonths,
+                allocatedMonths, gap, GetCapacityStatus(gap), GetAssignedEmployeesCount(employees, systemId), system.ManagementNote);
         }
 
-       
-        private static int GetAllocatedMonthsBySystemId(IEnumerable<Employee> employees, string systemId)
-        {
-            return employees
-                .SelectMany(e => e.Allocations ?? [])
-                .Where(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase))
-                .Sum(a => a.ActualMonths);
-        }
+        private static int GetAllocatedMonthsBySystemId(IEnumerable<Employee> employees, string systemId) =>
+            employees.SelectMany(e => e.Allocations ?? []).Where(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase)).Sum(a => a.ActualMonths);
 
-       
-        private static int GetAssignedEmployeesCount(IEnumerable<Employee> employees, string systemId)
-        {
-            return employees
-                .Where(e => (e.Allocations ?? [])
-                    .Any(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase)))
-                .Count();
-        }
+        private static int GetAssignedEmployeesCount(IEnumerable<Employee> employees, string systemId) =>
+            employees.Where(e => (e.Allocations ?? []).Any(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase))).Count();
 
-       
-        private static string GetCapacityStatus(int gap)
-        {
-            if (gap > 0)
-            {
-                return "Shortage";
-            }
+        private static string GetCapacityStatus(int gap) => gap > 0 ? "Shortage" : (gap == 0 ? "Balanced" : "Excess");
 
-            if (gap == 0)
-            {
-                return "Balanced";
-            }
-
-            return "Excess";
-        }
-
-     
         private static string GetEmployeeAvailabilityStatus(Employee employee)
         {
-            var allocated = (employee.Allocations ?? []).Sum(a => a.ActualMonths);
-            var remaining = employee.YearlyCapacityMonths - allocated;
-
-            if (remaining > 0)
-            {
-                return "Available";
-            }
-
-            if (remaining == 0)
-            {
-                return "Balanced";
-            }
-
-            return "Overloaded";
+            var remaining = employee.YearlyCapacityMonths - (employee.Allocations ?? []).Sum(a => a.ActualMonths);
+            return remaining > 0 ? "Available" : (remaining == 0 ? "Balanced" : "Overloaded");
         }
     }
 }

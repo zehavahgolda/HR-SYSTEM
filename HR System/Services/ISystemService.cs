@@ -4,14 +4,10 @@ namespace HR_System.Services
 {
     public interface ISystemService
     {
-   
-        Task<List<SystemListItemDto>> GetSystemsAsync(
-            int? year = null,
-            string? status = null,
-            string? ownerManagerName = null,
-            string? search = null);
-
-      
+        Task<List<SystemListItemDto>> GetSystemsAsync(int? year = null, string? status = null, string? ownerManagerName = null, string? search = null);
+        Task<List<SystemListItemDto>> GetSystemsWithShortageAsync();
         Task<SystemDetailsDto?> GetSystemByIdAsync(string id);
+
+        Task<byte[]> ExportSystemsToExcelAsync(int? year = null, string? status = null);
     }
 }

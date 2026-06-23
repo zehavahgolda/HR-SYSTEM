@@ -15,6 +15,9 @@ namespace HR_System.Controllers
             _employeeService = employeeService;
         }
 
+        /// <summary>
+        /// שליפת רשימת עובדים לפי פרמטרים.
+        /// </summary>
         [HttpGet]
         public async Task<ActionResult<List<EmployeeListItemDto>>> GetEmployees(
             [FromQuery] int? year,
@@ -38,6 +41,10 @@ namespace HR_System.Controllers
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// שליפת פרטי עובד ספציפי לפי מזהה.
+        /// </summary>
         [HttpGet("{id}")]
         public async Task<ActionResult<EmployeeDetailsDto>> GetEmployeeById(string id)
         {
@@ -57,7 +64,9 @@ namespace HR_System.Controllers
             }
         }
 
-      
+        /// <summary>
+        /// עדכון חודשי עבודה בפועל עבור הקצאת עובד למערכת.
+        /// </summary>
         [HttpPut("{id}/allocation-months")]
         public async Task<IActionResult> UpdateAllocationMonths(
             string id,
@@ -65,7 +74,6 @@ namespace HR_System.Controllers
             [FromQuery] string? roleInSystem,
             [FromQuery] int? actualMonths)
         {
-            // Validate required parameters
             if (string.IsNullOrWhiteSpace(systemId) || string.IsNullOrWhiteSpace(roleInSystem) || !actualMonths.HasValue)
             {
                 return BadRequest("Required parameters: systemId, roleInSystem, and actualMonths must be provided.");
@@ -77,6 +85,49 @@ namespace HR_System.Controllers
                 return NotFound("Employee allocation was not found for the specified system and role.");
 
             return Ok(new { message = $"Actual months updated to {actualMonths}." });
+        }
+
+        /// <summary>
+        /// יצירת עובד חדש.
+        /// </summary>
+        [HttpPost]
+        public async Task<ActionResult<string>> CreateEmployee([FromBody] EmployeeCreateDto dto)
+        {
+            var id = await _employeeService.CreateEmployeeAsync(dto);
+            return CreatedAtAction(nameof(GetEmployeeById), new { id }, id);
+        }
+
+        /// <summary>
+        /// עדכון עובד קיים.
+        /// </summary>
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateEmployee(string id, [FromBody] EmployeeUpdateDto dto)
+        {
+            var success = await _employeeService.UpdateEmployeeAsync(id, dto);
+            if (!success) return NotFound("Employee not found or no changes were made.");
+            return NoContent();
+        }
+
+        /// <summary>
+        /// הוספת הקצאה לעובד קיים.
+        /// </summary>
+        [HttpPost("{id}/allocations")]
+        public async Task<IActionResult> AddAllocation(string id, [FromBody] AllocationCreateDto dto)
+        {
+            var success = await _employeeService.AddAllocationAsync(id, dto);
+            if (!success) return NotFound("Employee not found or could not add allocation.");
+            return Ok();
+        }
+
+        /// <summary>
+        /// מחיקה רכה של עובד (שינוי סטטוס ללא פעיל).
+        /// </summary>
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteEmployee(string id)
+        {
+            var success = await _employeeService.DeleteEmployeeAsync(id);
+            if (!success) return NotFound("Employee not found.");
+            return NoContent();
         }
     }
 }

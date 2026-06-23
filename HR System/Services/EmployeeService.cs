@@ -1,9 +1,13 @@
-ο»Ώusing HR_System.DTOs.Employees;
+using HR_System.DTOs.Employees;
 using HR_System.Models;
 using MongoDB.Driver;
 
 namespace HR_System.Services
 {
+    /// <summary>
+    /// ωιψεϊ μπιδεμ ςεαγιν εδχφΰεϊιδν.
+    /// ΰηψΰι ςμ ωμιτδ, ιφιψδ, ςγλεο εηιωεα ρθθερι χιαεμϊ ωμ ςεαγιν αξςψλεϊ δωεπεϊ.
+    /// </summary>
     public class EmployeeService : IEmployeeService
     {
         private readonly IMongoCollection<Employee> _employeesCollection;
@@ -15,8 +19,6 @@ namespace HR_System.Services
             _systemsCollection = database.GetCollection<SystemModel>("systems");
         }
 
-
-        /// Χ©ΧΧ™Χ¤Χª Χ¨Χ©Χ™ΧΧª ΧΆΧ•Χ‘Χ“Χ™Χ ΧΧ΅Χ•Χ Χ Χª ΧΆΧ Χ—Χ™Χ©Χ•Χ‘ Χ©Χ“Χ•Χª =
         public async Task<List<EmployeeListItemDto>> GetEmployeesAsync(
             int? year = null,
             string? managerName = null,
@@ -25,207 +27,143 @@ namespace HR_System.Services
             string? search = null)
         {
             var employees = await _employeesCollection.Find(_ => true).ToListAsync();
-
             var filtered = employees.AsEnumerable();
 
-            if (year.HasValue)
-            {
-                filtered = filtered.Where(e => e.Year == year.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(managerName))
-            {
-                filtered = filtered.Where(e =>
-                    string.Equals(e.ManagerName, managerName, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(professionalCategory))
-            {
-                filtered = filtered.Where(e =>
-                    string.Equals(e.ProfessionalCategory, professionalCategory, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (!string.IsNullOrWhiteSpace(systemId))
-            {
-                filtered = filtered.Where(e =>
-                    (e.Allocations ?? []).Any(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase)));
-            }
+            if (year.HasValue) filtered = filtered.Where(e => e.Year == year.Value);
+            if (!string.IsNullOrWhiteSpace(managerName)) filtered = filtered.Where(e => string.Equals(e.ManagerName, managerName, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(professionalCategory)) filtered = filtered.Where(e => string.Equals(e.ProfessionalCategory, professionalCategory, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(systemId)) filtered = filtered.Where(e => (e.Allocations ?? new List<EmployeeAllocation>()).Any(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase)));
 
             if (!string.IsNullOrWhiteSpace(search))
             {
-                var searchTerm = search.Trim();
-                filtered = filtered.Where(e =>
-                    (!string.IsNullOrWhiteSpace(e.FullName) && e.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrWhiteSpace(e.ManagerName) && e.ManagerName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrWhiteSpace(e.ProfessionalCategory) && e.ProfessionalCategory.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrWhiteSpace(e.ProfessionalSubCategory) && e.ProfessionalSubCategory.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)));
+                var s = search.Trim();
+                filtered = filtered.Where(e => (!string.IsNullOrWhiteSpace(e.FullName) && e.FullName.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                                              (!string.IsNullOrWhiteSpace(e.ManagerName) && e.ManagerName.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                                              (!string.IsNullOrWhiteSpace(e.ProfessionalCategory) && e.ProfessionalCategory.Contains(s, StringComparison.OrdinalIgnoreCase)) ||
+                                              (!string.IsNullOrWhiteSpace(e.ProfessionalSubCategory) && e.ProfessionalSubCategory.Contains(s, StringComparison.OrdinalIgnoreCase)));
             }
 
-            return filtered
-                .Select(MapToListItemDto)
-                .OrderBy(e => e.FullName)
-                .ToList();
+            return filtered.Select(MapToListItemDto).OrderBy(e => e.FullName).ToList();
         }
 
-       //Χ©ΧΧ™Χ¤Χª ΧΆΧ•Χ‘Χ“
         public async Task<EmployeeDetailsDto?> GetEmployeeByIdAsync(string id)
         {
             var employee = await _employeesCollection.Find(e => e.Id == id).FirstOrDefaultAsync();
-            if (employee is null)
-            {
-                return null;
-            }
+            if (employee is null) return null;
 
             var systems = await _systemsCollection.Find(_ => true).ToListAsync();
-            var systemsById = systems
-                .Where(s => !string.IsNullOrWhiteSpace(s.Id))
-                .ToDictionary(s => s.Id!, s => s, StringComparer.OrdinalIgnoreCase);
-
+            var systemsById = systems.Where(s => !string.IsNullOrWhiteSpace(s.Id)).ToDictionary(s => s.Id!, s => s, StringComparer.OrdinalIgnoreCase);
             var allEmployees = await _employeesCollection.Find(_ => true).ToListAsync();
 
-            var allocations = (employee.Allocations ?? [])
-                .Select(a =>
-                {
-                    systemsById.TryGetValue(a.SystemId, out var system);
-                    return new EmployeeAllocationDto(
-                        a.SystemId,
-                        system?.Name ?? "Unknown",
-                        system is null ? "Unknown" : GetSystemCapacityStatus(system, allEmployees),
-                        a.RoleInSystem,
-                        a.PlannedMonths,
-                        a.ActualMonths);
-                })
-                .ToList();
+            var allocations = (employee.Allocations ?? new List<EmployeeAllocation>()).Select(a =>
+            {
+                systemsById.TryGetValue(a.SystemId, out var system);
+                return new EmployeeAllocationDto(a.SystemId, system?.Name ?? "Unknown", system is null ? "Unknown" : GetSystemCapacityStatus(system, allEmployees), a.RoleInSystem, a.PlannedMonths, a.ActualMonths);
+            }).ToList();
 
-            return new EmployeeDetailsDto(
-                employee.Id ?? string.Empty,
-                employee.FullName,
-                employee.ProfessionalCategory,
-                employee.ProfessionalSubCategory,
-                employee.ManagerName,
-                employee.Year,
-                employee.YearlyCapacityMonths,
-                GetAllocatedMonths(employee),
-                GetRemainingMonths(employee),
-                GetAvailabilityStatus(employee),
-                GetAssignedSystemsCount(employee),
-                employee.UpcomingEvent,
-                employee.Notes,
-                null, // TODO: Add managerReviewNote field to Employee model when available in Mongo schema.
-                [],
-                allocations);
+            return new EmployeeDetailsDto(employee.Id ?? string.Empty, employee.FullName, employee.ProfessionalCategory, employee.ProfessionalSubCategory, employee.ManagerName, employee.Year, employee.YearlyCapacityMonths, GetAllocatedMonths(employee), GetRemainingMonths(employee), GetAvailabilityStatus(employee), GetAssignedSystemsCount(employee), employee.UpcomingEvent, employee.Notes, null, new List<EmployeeRelevantChangeDto>(), allocations);
         }
 
-        public async Task<bool> UpdateAllocationActualMonthsAsync(
-            string employeeId,
-            string systemId,
-            string roleInSystem,
-            int actualMonths)
+        public async Task<bool> UpdateAllocationActualMonthsAsync(string employeeId, string systemId, string roleInSystem, int actualMonths)
         {
             var employee = await _employeesCollection.Find(e => e.Id == employeeId).FirstOrDefaultAsync();
-            if (employee is null)
-            {
-                return false;
-            }
+            if (employee is null) return false;
 
-            var allocations = employee.Allocations ?? [];
-            var allocationToUpdate = allocations.FirstOrDefault(a =>
-                string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(a.RoleInSystem, roleInSystem, StringComparison.OrdinalIgnoreCase));
-
-            if (allocationToUpdate is null)
-            {
-                return false;
-            }
+            var allocations = employee.Allocations ?? new List<EmployeeAllocation>();
+            var allocationToUpdate = allocations.FirstOrDefault(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase) && string.Equals(a.RoleInSystem, roleInSystem, StringComparison.OrdinalIgnoreCase));
+            if (allocationToUpdate is null) return false;
 
             allocationToUpdate.ActualMonths = actualMonths;
-
             var update = Builders<Employee>.Update.Set(e => e.Allocations, allocations);
-            var result = await _employeesCollection.UpdateOneAsync(e => e.Id == employeeId, update);
+            var res = await _employeesCollection.UpdateOneAsync(e => e.Id == employeeId, update);
+            return res.ModifiedCount > 0;
+        }
 
-            return result.ModifiedCount > 0;
+        public async Task<string> CreateEmployeeAsync(EmployeeCreateDto dto)
+        {
+            if (dto is null) throw new ArgumentNullException(nameof(dto));
+
+            var employee = new Employee
+            {
+                FullName = dto.FullName,
+                ProfessionalCategory = dto.ProfessionalCategory,
+                ProfessionalSubCategory = dto.ProfessionalSubCategory,
+                ManagerName = dto.ManagerName,
+                Year = dto.Year,
+                YearlyCapacityMonths = dto.YearlyCapacityMonths,
+                UpcomingEvent = dto.UpcomingEvent,
+                Notes = dto.Notes,
+                IsActive = dto.IsActive,
+                Allocations = (dto.Allocations ?? new List<AllocationCreateDto>()).Select(a => new EmployeeAllocation { SystemId = a.SystemId, RoleInSystem = a.RoleInSystem, PlannedMonths = a.PlannedMonths, ActualMonths = a.ActualMonths }).ToList()
+            };
+
+            await _employeesCollection.InsertOneAsync(employee);
+            return employee.Id ?? string.Empty;
+        }
+
+        public async Task<bool> UpdateEmployeeAsync(string id, EmployeeUpdateDto dto)
+        {
+            if (dto is null) return false;
+
+            var updateBuilder = Builders<Employee>.Update;
+            var updates = new List<UpdateDefinition<Employee>>();
+
+            if (dto.FullName is not null) updates.Add(updateBuilder.Set(e => e.FullName, dto.FullName));
+            if (dto.ProfessionalCategory is not null) updates.Add(updateBuilder.Set(e => e.ProfessionalCategory, dto.ProfessionalCategory));
+            if (dto.ProfessionalSubCategory is not null) updates.Add(updateBuilder.Set(e => e.ProfessionalSubCategory, dto.ProfessionalSubCategory));
+            if (dto.ManagerName is not null) updates.Add(updateBuilder.Set(e => e.ManagerName, dto.ManagerName));
+            if (dto.Year.HasValue) updates.Add(updateBuilder.Set(e => e.Year, dto.Year.Value));
+            if (dto.YearlyCapacityMonths.HasValue) updates.Add(updateBuilder.Set(e => e.YearlyCapacityMonths, dto.YearlyCapacityMonths.Value));
+            if (dto.UpcomingEvent is not null) updates.Add(updateBuilder.Set(e => e.UpcomingEvent, dto.UpcomingEvent));
+            if (dto.Notes is not null) updates.Add(updateBuilder.Set(e => e.Notes, dto.Notes));
+            if (dto.IsActive.HasValue) updates.Add(updateBuilder.Set(e => e.IsActive, dto.IsActive.Value));
+
+            if (!updates.Any()) return false;
+
+            var res = await _employeesCollection.UpdateOneAsync(e => e.Id == id, updateBuilder.Combine(updates));
+            return res.ModifiedCount > 0;
+        }
+
+        public async Task<bool> AddAllocationAsync(string employeeId, AllocationCreateDto dto)
+        {
+            if (dto is null) return false;
+
+            var allocation = new EmployeeAllocation { SystemId = dto.SystemId, RoleInSystem = dto.RoleInSystem, PlannedMonths = dto.PlannedMonths, ActualMonths = dto.ActualMonths };
+            var res = await _employeesCollection.UpdateOneAsync(e => e.Id == employeeId, Builders<Employee>.Update.Push(e => e.Allocations, allocation));
+            return res.ModifiedCount > 0;
+        }
+
+        public async Task<bool> DeleteEmployeeAsync(string id)
+        {
+            var res = await _employeesCollection.UpdateOneAsync(e => e.Id == id, Builders<Employee>.Update.Set(e => e.IsActive, false));
+            return res.ModifiedCount > 0;
         }
 
         private static EmployeeListItemDto MapToListItemDto(Employee employee)
         {
             var allocatedMonths = GetAllocatedMonths(employee);
-            var remainingMonths = employee.YearlyCapacityMonths - allocatedMonths;
-
-            return new EmployeeListItemDto(
-                employee.Id ?? string.Empty,
-                employee.FullName,
-                employee.ProfessionalCategory,
-                employee.ProfessionalSubCategory,
-                employee.ManagerName,
-                employee.Year,
-                employee.YearlyCapacityMonths,
-                allocatedMonths,
-                remainingMonths,
-                GetAvailabilityStatus(employee),
-                GetAssignedSystemsCount(employee),
-                employee.UpcomingEvent);
+            return new EmployeeListItemDto(employee.Id ?? string.Empty, employee.FullName, employee.ProfessionalCategory, employee.ProfessionalSubCategory, employee.ManagerName, employee.Year, employee.YearlyCapacityMonths, allocatedMonths, GetRemainingMonths(employee), GetAvailabilityStatus(employee), GetAssignedSystemsCount(employee), employee.UpcomingEvent);
         }
 
-        private static int GetAllocatedMonths(Employee employee)
-        {
-            return (employee.Allocations ?? []).Sum(a => a.ActualMonths);
-        }
+        private static int GetAllocatedMonths(Employee employee) => (employee.Allocations ?? new List<EmployeeAllocation>()).Sum(a => a.ActualMonths);
 
-        private static int GetRemainingMonths(Employee employee)
-        {
-            return employee.YearlyCapacityMonths - GetAllocatedMonths(employee);
-        }
+        private static int GetRemainingMonths(Employee employee) => employee.YearlyCapacityMonths - GetAllocatedMonths(employee);
 
         private static string GetAvailabilityStatus(Employee employee)
         {
             var remaining = GetRemainingMonths(employee);
-
-            if (remaining > 0)
-            {
-                return "Available";
-            }
-
-            if (remaining == 0)
-            {
-                return "Balanced";
-            }
-
-            return "Overloaded";
+            return remaining > 0 ? "Available" : (remaining == 0 ? "Balanced" : "Overloaded");
         }
 
-      
-        private static int GetAssignedSystemsCount(Employee employee)
-        {
-            return (employee.Allocations ?? [])
-                .Where(a => !string.IsNullOrWhiteSpace(a.SystemId))
-                .Select(a => a.SystemId)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count();
-        }
+        private static int GetAssignedSystemsCount(Employee employee) => (employee.Allocations ?? new List<EmployeeAllocation>()).Select(a => a.SystemId).Distinct().Count();
 
-        private static int GetSystemAllocatedMonths(IEnumerable<Employee> employees, string systemId)
-        {
-            return employees
-                .SelectMany(e => e.Allocations ?? [])
-                .Where(a => string.Equals(a.SystemId, systemId, StringComparison.OrdinalIgnoreCase))
-                .Sum(a => a.ActualMonths);
-        }
         private static string GetSystemCapacityStatus(SystemModel system, IEnumerable<Employee> allEmployees)
         {
-            var allocated = GetSystemAllocatedMonths(allEmployees, system.Id ?? string.Empty);
+            var allocated = allEmployees.SelectMany(e => e.Allocations ?? new List<EmployeeAllocation>())
+                                        .Where(a => string.Equals(a.SystemId, system.Id, StringComparison.OrdinalIgnoreCase))
+                                        .Sum(a => a.ActualMonths);
             var gap = system.RequiredCapacityMonths - allocated;
-
-            if (gap > 0)
-            {
-                return "Shortage";
-            }
-
-            if (gap == 0)
-            {
-                return "Balanced";
-            }
-
-            return "Excess";
+            return gap > 0 ? "Shortage" : (gap == 0 ? "Balanced" : "Excess");
         }
     }
 }

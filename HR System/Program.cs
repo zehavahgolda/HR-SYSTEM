@@ -3,24 +3,41 @@ using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. ����� ������ ������ ���� �-appsettings.json
+// Read MongoDB connection config from appsettings.json
 var connectionString = builder.Configuration["MongoDB:ConnectionString"];
 var databaseName = builder.Configuration["MongoDB:DatabaseName"];
 
-// 2. ����� �-MongoClient �-Singleton (���� ��� ��� ������)
+// Register MongoClient as singleton
 builder.Services.AddSingleton<IMongoClient>(new MongoClient(connectionString));
 
-// 3. ����� �-IMongoDatabase (�� �� ���� �� ��� ����� �� ������)
+// Register IMongoDatabase scoped per request
 builder.Services.AddScoped<IMongoDatabase>(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(databaseName));
 
-// 4. ����� ��������� ���
-builder.Services.AddControllers();
+// Add controllers and configure JSON serialization for frontend compatibility
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Register application services for DI
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<ISystemService, SystemService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<IChangeService, ChangeService>();
+// Add CORS policy for local UI (adjust in production)
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowLocalUI", policy =>
+    {
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -31,6 +48,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Enable CORS globally
+app.UseCors("AllowLocalUI");
+
 app.UseAuthorization();
 app.MapControllers();
 
